@@ -74,7 +74,7 @@ namespace Microsoft.AspNetCore.CookiePolicy
 
             private bool PolicyRequiresCookieOptions()
             {
-                return Policy.HttpOnly != HttpOnlyPolicy.None || Policy.Secure != CookieSecurePolicy.None;
+                return Policy.SameSite != SameSitePolicy.None || Policy.HttpOnly != HttpOnlyPolicy.None || Policy.Secure != CookieSecurePolicy.None;
             }
 
             public void Append(string key, string value)
@@ -147,6 +147,22 @@ namespace Microsoft.AspNetCore.CookiePolicy
                         options.Secure = Context.Request.IsHttps;
                         break;
                     case CookieSecurePolicy.None:
+                        break;
+                    default:
+                        throw new InvalidOperationException();
+                }
+                switch (Policy.SameSite)
+                {
+                    case SameSitePolicy.None:
+                        break;
+                    case SameSitePolicy.LaxOrStrict:
+                        if (options.SameSite == SameSiteEnforcementMode.None)
+                        {
+                            options.SameSite = SameSiteEnforcementMode.Lax;
+                        }
+                        break;
+                    case SameSitePolicy.AlwaysStrict:
+                        options.SameSite = SameSiteEnforcementMode.Strict;
                         break;
                     default:
                         throw new InvalidOperationException();

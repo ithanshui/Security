@@ -36,6 +36,15 @@ namespace Microsoft.AspNetCore.CookiePolicy.Test
             context.Response.Cookies.Append("D", "D", new CookieOptions { HttpOnly = true });
             return Task.FromResult(0);
         };
+        private RequestDelegate SameSiteCookieAppends = context =>
+        {
+            context.Response.Cookies.Append("A", "A");
+            context.Response.Cookies.Append("B", "B", new CookieOptions { SameSite = Http.SameSiteEnforcementMode.None });
+            context.Response.Cookies.Append("C", "C", new CookieOptions());
+            context.Response.Cookies.Append("D", "D", new CookieOptions { SameSite = Http.SameSiteEnforcementMode.Lax });
+            context.Response.Cookies.Append("E", "E", new CookieOptions { SameSite = Http.SameSiteEnforcementMode.Strict });
+            return Task.FromResult(0);
+        };
 
         [Fact]
         public async Task SecureAlwaysSetsSecure()
@@ -143,6 +152,69 @@ namespace Microsoft.AspNetCore.CookiePolicy.Test
                     Assert.Equal("B=B; path=/", transaction.SetCookie[1]);
                     Assert.Equal("C=C; path=/", transaction.SetCookie[2]);
                     Assert.Equal("D=D; path=/; httponly", transaction.SetCookie[3]);
+                }));
+        }
+
+        [Fact]
+        public async Task SameSiteStrictSetsItAlways()
+        {
+            await RunTest("/sameSiteStrict",
+                new CookiePolicyOptions
+                {
+                    SameSite = SameSitePolicy.AlwaysStrict
+                },
+                SameSiteCookieAppends,
+                new RequestTest("http://example.com/sameSiteStrict",
+                transaction =>
+                {
+                    Assert.NotNull(transaction.SetCookie);
+                    Assert.Equal("A=A; path=/; samesite=strict", transaction.SetCookie[0]);
+                    Assert.Equal("B=B; path=/; samesite=strict", transaction.SetCookie[1]);
+                    Assert.Equal("C=C; path=/; samesite=strict", transaction.SetCookie[2]);
+                    Assert.Equal("D=D; path=/; samesite=strict", transaction.SetCookie[3]);
+                    Assert.Equal("E=E; path=/; samesite=strict", transaction.SetCookie[4]);
+                }));
+        }
+
+        [Fact]
+        public async Task SameSiteLaxSetsItAlways()
+        {
+            await RunTest("/sameSiteLax",
+                new CookiePolicyOptions
+                {
+                    SameSite = SameSitePolicy.LaxOrStrict
+                },
+                SameSiteCookieAppends,
+                new RequestTest("http://example.com/sameSiteLax",
+                transaction =>
+                {
+                    Assert.NotNull(transaction.SetCookie);
+                    Assert.Equal("A=A; path=/; samesite=lax", transaction.SetCookie[0]);
+                    Assert.Equal("B=B; path=/; samesite=lax", transaction.SetCookie[1]);
+                    Assert.Equal("C=C; path=/; samesite=lax", transaction.SetCookie[2]);
+                    Assert.Equal("D=D; path=/; samesite=lax", transaction.SetCookie[3]);
+                    Assert.Equal("E=E; path=/; samesite=strict", transaction.SetCookie[4]);
+                }));
+        }
+
+        [Fact]
+        public async Task SameSiteNoneLeavesItAlone()
+        {
+            await RunTest("/sameSiteNone",
+                new CookiePolicyOptions
+                {
+                    HttpOnly = HttpOnlyPolicy.None
+                },
+                SameSiteCookieAppends,
+                new RequestTest("http://example.com/sameSiteNone",
+                transaction =>
+                {
+                    Assert.NotNull(transaction.SetCookie);
+                    Assert.Equal("A=A; path=/", transaction.SetCookie[0]);
+                    Assert.Equal("B=B; path=/", transaction.SetCookie[1]);
+                    Assert.Equal("C=C; path=/", transaction.SetCookie[2]);
+                    Assert.Equal("D=D; path=/; samesite=lax", transaction.SetCookie[3]);
+                    Assert.Equal("E=E; path=/; samesite=strict", transaction.SetCookie[4]);
                 }));
         }
 
